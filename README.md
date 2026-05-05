@@ -1,4 +1,4 @@
-monome 2011 visualizer
+monome 2011 256 grid visualizer
 
 a real-time audio visualizer for the monome grid. audio input is analyzed and mapped to the grid's leds, giving you a live visual response to whatever is playing through your system.
 
