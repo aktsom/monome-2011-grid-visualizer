@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>monome visualizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #bbb;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      padding: 2rem;
+      max-width: 560px;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 14px;
+      color: #fff;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+    }
+
+    header p {
+      color: #444;
+      font-size: 11px;
+      margin-top: 0.3rem;
+    }
+
+    section {
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #555;
+      margin-bottom: 0.8rem;
+      border-bottom: 1px solid #1e1e1e;
+      padding-bottom: 0.4rem;
+    }
+
+    .row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    select {
+      flex: 1;
+      background: #1a1a1a;
+      color: #bbb;
+      border: 1px solid #2a2a2a;
+      padding: 0.45rem 0.6rem;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      border-radius: 2px;
+    }
+
+    select:focus { border-color: #444; }
+
+    button {
+      background: #1e1e1e;
+      color: #aaa;
+      border: 1px solid #2e2e2e;
+      padding: 0.45rem 0.9rem;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 2px;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    button:hover { background: #282828; color: #ddd; }
+    button:active { background: #333; }
+
+    .status {
+      font-size: 11px;
+      color: #444;
+      margin-top: 0.4rem;
+      min-height: 1.2em;
+    }
+
+    .status.ok  { color: #5a8a5a; }
+    .status.err { color: #8a4a4a; }
+
+    .gain-row {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    input[type=range] {
+      flex: 1;
+      accent-color: #555;
+      cursor: pointer;
+    }
+
+    .gain-val {
+      color: #888;
+      min-width: 3em;
+      text-align: right;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #333;
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+
+    .dot.on { background: #5a8a5a; }
+
+    .trim-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .trim-label {
+      font-size: 10px;
+      color: #555;
+      min-width: 5.5em;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .trim-row input[type=range] {
+      flex: 1;
+      accent-color: #555;
+      cursor: pointer;
+    }
+
+    .trim-val {
+      font-size: 10px;
+      color: #666;
+      min-width: 2.8em;
+      text-align: right;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>monome visualizer</h1>
+    <p>real-time audio → grid</p>
+  </header>
+
+  <section>
+    <h2>Grid</h2>
+    <div class="row">
+      <select id="grid-select"></select>
+      <button onclick="connectGrid()">connect</button>
+    </div>
+    <div class="status" id="grid-status">scanning...</div>
+  </section>
+
+  <section>
+    <h2>Audio Input</h2>
+    <div class="row">
+      <select id="audio-select"></select>
+      <button onclick="applyAudio()">apply</button>
+    </div>
+    <div class="status" id="audio-status">—</div>
+    <div style="margin-top:0.4rem">
+      <a id="audio-toggle" href="#" onclick="toggleAllDevices(event)"
+         style="font-size:11px;color:#444;text-decoration:none;">show all inputs</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Visual Preset</h2>
+    <select id="preset-select" onchange="applyPreset()"></select>
+  </section>
+
+  <section>
+    <h2>Gain</h2>
+    <div class="gain-row">
+      <input type="range" id="gain-slider" min="1" max="20" step="0.5" value="8"
+             oninput="applyGain(this.value)">
+      <span class="gain-val" id="gain-val">8.0</span>
+    </div>
+  </section>
+
+  <section id="led-roles-section">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+      LED Roles
+      <button onclick="resetLedRoles()" style="font-size:10px;padding:0.2rem 0.5rem;">reset</button>
+    </h2>
+    <div id="led-roles-sliders"></div>
+  </section>
+
+  <section id="col-brightness-section">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+      Column Brightness
+      <button onclick="resetColBrightness()" style="font-size:10px;padding:0.2rem 0.5rem;">reset</button>
+    </h2>
+    <div id="col-brightness-sliders"></div>
+  </section>
+
+  <section id="trim-section">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+      Band Trim
+      <button onclick="resetTrim()" style="font-size:10px;padding:0.2rem 0.5rem;">reset</button>
+    </h2>
+    <div id="trim-sliders"></div>
+  </section>
+
+  <script>
+    const $ = id => document.getElementById(id);
+
+    async function fetchJSON(url, opts) {
+      const r = await fetch(url, opts);
+      return r.json();
+    }
+
+    // ── status poll ──────────────────────────────────────────────────────────
+
+    async function refreshStatus() {
+      const s = await fetchJSON('/api/status');
+
+      // gain
+      $('gain-slider').value = s.gain;
+      $('gain-val').textContent = parseFloat(s.gain).toFixed(1);
+
+      // preset
+      if (s.preset) $('preset-select').value = s.preset;
+
+      // grid connection indicator
+      if (s.active_grid) {
+        $('grid-status').textContent = `● connected — ${s.active_grid}`;
+        $('grid-status').className = 'status ok';
+      } else {
+        $('grid-status').textContent = 'not connected';
+        $('grid-status').className = 'status';
+      }
+
+      // refresh grid dropdown with live list
+      populateGrids(s.grids, s.active_grid);
+    }
+
+    // ── grids ────────────────────────────────────────────────────────────────
+
+    function populateGrids(grids, activeId) {
+      const sel = $('grid-select');
+      const prev = sel.value;
+      sel.innerHTML = '';
+      const ids = Object.keys(grids);
+      if (ids.length === 0) {
+        sel.innerHTML = '<option value="">no grids detected</option>';
+        return;
+      }
+      ids.forEach(id => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${id}  —  ${grids[id].type}`;
+        if (id === prev || id === activeId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    // ── audio devices ────────────────────────────────────────────────────────
+
+    let _showAllDevices = false;
+
+    async function loadAudioDevices() {
+      const [devices, status] = await Promise.all([
+        fetchJSON(_showAllDevices ? '/api/audio-devices?all=1' : '/api/audio-devices'),
+        fetchJSON('/api/status'),
+      ]);
+      const sel = $('audio-select');
+      sel.innerHTML = '';
+      devices.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.index;
+        opt.textContent = `${d.index}: ${d.name}`;
+        if (d.index === status.audio_device) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function toggleAllDevices(e) {
+      e.preventDefault();
+      _showAllDevices = !_showAllDevices;
+      $('audio-toggle').textContent = _showAllDevices ? 'show fewer inputs' : 'show all inputs';
+      loadAudioDevices();
+    }
+
+    // ── presets ───────────────────────────────────────────────────────────────
+
+    async function loadPresets() {
+      const presets = await fetchJSON('/api/presets');
+      const sel = $('preset-select');
+      sel.innerHTML = '';
+      presets.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p.replace(/-/g, ' ');
+        sel.appendChild(opt);
+      });
+    }
+
+    // ── actions ───────────────────────────────────────────────────────────────
+
+    async function connectGrid() {
+      const id = $('grid-select').value;
+      if (!id) return;
+      $('grid-status').textContent = `connecting to ${id}…`;
+      $('grid-status').className = 'status';
+      await fetchJSON('/api/connect-grid', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id}),
+      });
+    }
+
+    async function applyAudio() {
+      const device = parseInt($('audio-select').value);
+      $('audio-status').textContent = 'restarting audio stream…';
+      $('audio-status').className = 'status';
+      await fetchJSON('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({audio_device: device}),
+      });
+      setTimeout(() => {
+        $('audio-status').textContent = 'applied';
+        $('audio-status').className = 'status ok';
+      }, 1200);
+    }
+
+    async function applyPreset() {
+      const preset = $('preset-select').value;
+      await fetchJSON('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({preset}),
+      });
+      rebuildLedRoles();
+      rebuildColBrightness();
+      rebuildTrimSliders();
+      await refreshStatus();
+    }
+
+    async function applyGain(val) {
+      $('gain-val').textContent = parseFloat(val).toFixed(1);
+      await fetchJSON('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({gain: parseFloat(val)}),
+      });
+    }
+
+    // ── LED roles ─────────────────────────────────────────────────────────────
+
+    const SPECTRUM_PRESETS = ['01 spectrum', '02 spectrum 8', '06 spectrum peak'];
+    const ROLE_LABELS = {bar: 'bar fill', tip: 'tip', peak: 'peak dot'};
+    const ROLE_DEFAULTS = {bar: 15, tip: 8, peak: 3};
+
+    let _ledRoles = {};
+
+    async function loadLedRoles() {
+      _ledRoles = await fetchJSON('/api/led-roles');
+      rebuildLedRoles();
+    }
+
+    function rebuildLedRoles() {
+      const preset  = $('preset-select').value;
+      const section = $('led-roles-section');
+      if (!SPECTRUM_PRESETS.includes(preset)) { section.style.display = 'none'; return; }
+      section.style.display = '';
+      const roles     = _ledRoles[preset] || {};
+      const container = $('led-roles-sliders');
+      container.innerHTML = '';
+      Object.entries(roles).forEach(([role, val]) => {
+        const row = document.createElement('div');
+        row.className = 'trim-row';
+        row.innerHTML =
+          `<span class="trim-label">${ROLE_LABELS[role]}</span>` +
+          `<input type="range" min="1" max="15" step="1" value="${val}" oninput="onRoleInput(this,'${role}')">` +
+          `<span class="trim-val" id="rv-${role}">${val}</span>`;
+        container.appendChild(row);
+      });
+    }
+
+    let _roleTimer = null;
+
+    function onRoleInput(el, role) {
+      const preset = $('preset-select').value;
+      const val    = parseInt(el.value);
+      $(`rv-${role}`).textContent = val;
+      if (_ledRoles[preset]) _ledRoles[preset][role] = val;
+      clearTimeout(_roleTimer);
+      _roleTimer = setTimeout(saveLedRoles, 250);
+    }
+
+    function resetLedRoles() {
+      const preset = $('preset-select').value;
+      if (!_ledRoles[preset]) return;
+      for (const role of Object.keys(_ledRoles[preset]))
+        _ledRoles[preset][role] = ROLE_DEFAULTS[role];
+      rebuildLedRoles();
+      saveLedRoles();
+    }
+
+    async function saveLedRoles() {
+      const preset = $('preset-select').value;
+      if (!_ledRoles[preset]) return;
+      await fetchJSON('/api/led-roles', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({preset, roles: _ledRoles[preset]}),
+      });
+    }
+
+    // ── column brightness ─────────────────────────────────────────────────────
+
+    const COL_BRIGHT_LABELS = {
+      '01 spectrum':      ['40–58','58–85','85–123','123–179','179–260','260–378','378–550','550–800','800–1.2k','1.2–1.7k','1.7–2.5k','2.5–3.6k','3.6–5.2k','5.2–7.6k','7.6–11k','11–16k'],
+      '02 spectrum 8':    ['40–85','85–179','179–378','378–800','800–1.7k','1.7–3.6k','3.6–7.6k','7.6–16k'],
+      '06 spectrum peak': ['40–58','58–85','85–123','123–179','179–260','260–378','378–550','550–800','800–1.2k','1.2–1.7k','1.7–2.5k','2.5–3.6k','3.6–5.2k','5.2–7.6k','7.6–11k','11–16k'],
+    };
+
+    let _colBrightness = {};
+
+    async function loadColBrightness() {
+      _colBrightness = await fetchJSON('/api/col-brightness');
+      rebuildColBrightness();
+    }
+
+    function rebuildColBrightness() {
+      const preset  = $('preset-select').value;
+      const section = $('col-brightness-section');
+      const labels  = COL_BRIGHT_LABELS[preset];
+      if (!labels) { section.style.display = 'none'; return; }
+      section.style.display = '';
+      const vals      = _colBrightness[preset] || Array(labels.length).fill(1.0);
+      const container = $('col-brightness-sliders');
+      container.innerHTML = '';
+      vals.forEach((v, i) => {
+        const row = document.createElement('div');
+        row.className = 'trim-row';
+        row.innerHTML =
+          `<span class="trim-label">${labels[i]}</span>` +
+          `<input type="range" min="0" max="1" step="0.05" value="${v}" oninput="onColBrightInput(this,${i})">` +
+          `<span class="trim-val" id="cb-${i}">${v.toFixed(2)}</span>`;
+        container.appendChild(row);
+      });
+    }
+
+    let _colBrightTimer = null;
+
+    function onColBrightInput(el, i) {
+      const preset = $('preset-select').value;
+      const val    = parseFloat(el.value);
+      $(`cb-${i}`).textContent = val.toFixed(2);
+      if (_colBrightness[preset]) _colBrightness[preset][i] = val;
+      clearTimeout(_colBrightTimer);
+      _colBrightTimer = setTimeout(saveColBrightness, 250);
+    }
+
+    function resetColBrightness() {
+      const preset = $('preset-select').value;
+      const labels = COL_BRIGHT_LABELS[preset];
+      if (!labels) return;
+      _colBrightness[preset] = Array(labels.length).fill(1.0);
+      rebuildColBrightness();
+      saveColBrightness();
+    }
+
+    async function saveColBrightness() {
+      const preset = $('preset-select').value;
+      if (!_colBrightness[preset]) return;
+      await fetchJSON('/api/col-brightness', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({preset, values: _colBrightness[preset]}),
+      });
+    }
+
+    // ── band trim ─────────────────────────────────────────────────────────────
+
+    const TRIM_LABELS = {
+      '01 spectrum':      ['40–58','58–85','85–123','123–179','179–260','260–378','378–550','550–800','800–1.2k','1.2–1.7k','1.7–2.5k','2.5–3.6k','3.6–5.2k','5.2–7.6k','7.6–11k','11–16k'],
+      '02 spectrum 8':    ['40–85','85–179','179–378','378–800','800–1.7k','1.7–3.6k','3.6–7.6k','7.6–16k'],
+      '06 spectrum peak': ['40–58','58–85','85–123','123–179','179–260','260–378','378–550','550–800','800–1.2k','1.2–1.7k','1.7–2.5k','2.5–3.6k','3.6–5.2k','5.2–7.6k','7.6–11k','11–16k'],
+    };
+
+    let _trim = {};
+
+    async function loadTrim() {
+      _trim = await fetchJSON('/api/trim');
+      rebuildTrimSliders();
+    }
+
+    function rebuildTrimSliders() {
+      const preset  = $('preset-select').value;
+      const labels  = TRIM_LABELS[preset];
+      const section = $('trim-section');
+      if (!labels) { section.style.display = 'none'; return; }
+      section.style.display = '';
+      const vals = _trim[preset] || Array(labels.length).fill(1.0);
+      const container = $('trim-sliders');
+      container.innerHTML = '';
+      vals.forEach((v, i) => {
+        const row = document.createElement('div');
+        row.className = 'trim-row';
+        row.innerHTML =
+          `<span class="trim-label">${labels[i]}</span>` +
+          `<input type="range" min="0" max="2" step="0.05" value="${v}" oninput="onTrimInput(this,${i})">` +
+          `<span class="trim-val" id="tv-${i}">${v.toFixed(2)}</span>`;
+        container.appendChild(row);
+      });
+    }
+
+    let _trimTimer = null;
+
+    function onTrimInput(el, i) {
+      const preset = $('preset-select').value;
+      const val    = parseFloat(el.value);
+      $(`tv-${i}`).textContent = val.toFixed(2);
+      if (_trim[preset]) _trim[preset][i] = val;
+      clearTimeout(_trimTimer);
+      _trimTimer = setTimeout(saveTrim, 250);
+    }
+
+    function resetTrim() {
+      const preset = $('preset-select').value;
+      const labels = TRIM_LABELS[preset];
+      if (!labels) return;
+      _trim[preset] = Array(labels.length).fill(1.0);
+      rebuildTrimSliders();
+      saveTrim();
+    }
+
+    async function saveTrim() {
+      const preset = $('preset-select').value;
+      if (!_trim[preset]) return;
+      await fetchJSON('/api/trim', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({preset, values: _trim[preset]}),
+      });
+    }
+
+    // ── init ──────────────────────────────────────────────────────────────────
+
+    function heartbeat() {
+      fetch('/api/heartbeat', {method: 'POST'}).catch(() => {});
+    }
+
+    loadAudioDevices();
+    loadPresets().then(() => { refreshStatus(); loadLedRoles(); loadColBrightness(); loadTrim(); });
+    heartbeat();
+    setInterval(refreshStatus, 2000);   // poll for grid list + connection state
+    setInterval(heartbeat, 3000);       // keep render loop alive while tab is open
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+sounddevice>=0.4.6
+numpy>=1.24
+pymonome>=0.11
+flask>=3.0
+pystray>=0.19
+Pillow>=10.0
