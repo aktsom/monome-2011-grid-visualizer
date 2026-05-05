@@ -130,7 +130,7 @@ presets
                     inner ring = bass (40–250 hz), middle ring = mids (250–4000 hz),
                     outer ring = highs (4000–16000 hz)
   06 spectrum peak  16-band spectrum with floating peak-hold dots
-                    (not visible on older 4 step led grids)
+                    
   07 ripple         amplitude envelope as symmetric horizontal bars expanding
                     from the centre outward, with brightness decay trail
 
