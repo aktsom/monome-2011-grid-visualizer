@@ -54,6 +54,7 @@ audio dependencies
     sounddevice works out of the box. for best results use an asio or wasapi driver.
 
   macOS:
+    (i haven't tested it on mac since i don't have one, so i don't know for sure that it will work)
     sounddevice uses core audio natively — no extra setup needed.
     if you see portaudio errors:
       brew install portaudio
