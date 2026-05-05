@@ -38,7 +38,7 @@ def add_grid(id, port, type):
         _grids[id] = {'port': port, 'type': type}
 
 
-PRESETS = ['01 spectrum', '02 spectrum 8', '03 flame', '04 lissajous', '05 beat pulse', '06 spectrum peak', '07 waveform']
+PRESETS = ['01 spectrum', '02 spectrum 8', '03 flame', '04 lissajous', '05 rings', '06 spectrum peak', '07 ripple']
 preset_gain = {p: 8.0 for p in PRESETS}
 preset_gain['03 flame'] = 3.0
 

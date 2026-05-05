@@ -1,7 +1,7 @@
 
 monome 2011 visualizer
 ======================
-Real-time audio visualizer for monome grid (16×16) 4 step varibright. Works with newer grids as well but only 4 led levels are used. 
+Real-time audio visualizer for monome grid (16×16) 4 step varibright. Works with newer grids as well but only 4 led levels are used.
 Audio input → analysis → grid LEDs, controlled via browser UI at http://localhost:5000
 
 
@@ -102,7 +102,7 @@ UI CONTROLS
   Grid          — select and connect a detected monome grid
   Audio Input   — select audio input device; click Apply to switch
                   "show all inputs" reveals non-ASIO/WASAPI/CoreAudio devices
-  Visual Preset — choose one of six presets (see below)
+  Visual Preset — choose one of seven presets (see below)
   Gain          — input sensitivity; default 8.0, range 1–20
                   each preset remembers its own gain setting
 
@@ -120,16 +120,20 @@ PRESETS
 -------
   01 spectrum       16-band log-spaced spectrum, 40 Hz – 16 kHz
   02 spectrum 8     8-band spectrum, each band 2 columns wide
-  03 waveform       Stereo scrolling waveform — right channel top half,
-                    left channel bottom half
+  03 flame          Amplitude envelope rendered as an upward fire shape,
+                    scrolling from bottom with brightness decay and flickering tips
   04 lissajous      L vs R XY plot with brightness trail decay
-  05 beat pulse     Onset detection (spectral flux) triggers an expanding
-                    ring pulse from the centre
-  06 spectrum peak  16-band spectrum with floating peak-hold dots (not visible on older 4 step led grids)
+  05 rings          Three concentric frequency-band level meters:
+                    inner ring = bass (40–250 Hz), middle ring = mids (250–4000 Hz),
+                    outer ring = highs (4000–16000 Hz)
+  06 spectrum peak  16-band spectrum with floating peak-hold dots
+                    (not visible on older 4 step led grids)
+  07 ripple         Amplitude envelope as symmetric horizontal bars expanding
+                    from the centre outward, with brightness decay trail
 
 
-FREQUENCY BANDS (spectrum presets)
------------------------------------
+FREQUENCY BANDS (spectrum presets 01, 02, 06)
+----------------------------------------------
   Col  1   40 –   58 Hz     Col  9    800 – 1.2 kHz
   Col  2   58 –   85 Hz     Col 10    1.2 – 1.7 kHz
   Col  3   85 –  123 Hz     Col 11    1.7 – 2.5 kHz

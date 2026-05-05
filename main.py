@@ -44,11 +44,9 @@ WF_ENV_DECAY     = 0.80   # envelope decay per scroll step — slower = taller t
 WF_DECAY_EVERY   = 5      # scroll steps between row brightness decay (15→9→4→0)
 WF_FLICKER_EVERY = 5      # scroll steps between flicker pattern re-rolls (~250ms)
 
+PULSE_DECAY      = 0.35   # beat pulse only — faster than DECAY for punchy response
 
-PULSE_SPEED      = 2     # frames between pulse expansion steps
-ONSET_THRESHOLD  = 1.4   # current flux must be this × avg to fire a pulse
-ONSET_COOLDOWN   = 12    # frames between allowed onsets (prevents rapid re-fire)
-ONSET_MIN_FLUX   = 5.0   # absolute flux floor — no pulse fires below this level
+
 
 HEARTBEAT_TIMEOUT = 30.0
 
@@ -92,6 +90,14 @@ _edges_8   = np.logspace(np.log10(FREQ_MIN), np.log10(FREQ_MAX), 9)
 _band_lo_8 = np.searchsorted(_fft_freqs, _edges_8[:-1]).clip(1, len(_fft_freqs) - 1)
 _band_hi_8 = np.maximum(np.searchsorted(_fft_freqs, _edges_8[1:]), _band_lo_8 + 1).clip(1, len(_fft_freqs))
 
+# beat pulse — three concentric frequency bands
+_bass_lo  = int(np.searchsorted(_fft_freqs,    40.0))
+_bass_hi  = int(np.searchsorted(_fft_freqs,   250.0))
+_mid_lo   = int(np.searchsorted(_fft_freqs,   250.0))
+_mid_hi   = int(np.searchsorted(_fft_freqs,  4000.0))
+_high_lo  = int(np.searchsorted(_fft_freqs,  4000.0))
+_high_hi  = int(np.searchsorted(_fft_freqs, 16000.0))
+
 
 # ── visualizer ────────────────────────────────────────────────────────────────
 
@@ -114,12 +120,10 @@ class Visualizer(monome.GridApp):
         self._wf_rows         = []   # [[half_cols, brightness], ...] newest first
         self._ctr_rows        = []   # same structure for 07 waveform
         self._ctr_decay_ctr   = 0
-        self._pulses          = []   # list of [radius, brightness]
-        self._pulse_ctr       = 0
-        self._onset_avg       = 0.0
-        self._onset_cooldown  = 0
+        self._bass_level      = 0.0   # smoothed bass band level [0, 1]
+        self._mid_level       = 0.0   # smoothed mid band level  [0, 1]
+        self._high_level      = 0.0   # smoothed high band level [0, 1]
         self._dist_map        = None  # precomputed per-cell distance from centre
-        self._prev_spectrum   = None  # previous FFT frame for spectral flux
 
     def on_grid_ready(self):
         gw, gh = self.grid.width, self.grid.height
@@ -139,10 +143,9 @@ class Visualizer(monome.GridApp):
         self._wf_rows         = []
         self._ctr_rows        = []
         self._ctr_decay_ctr   = 0
-        self._pulses         = []
-        self._onset_avg      = 0.0
-        self._onset_cooldown = 0
-        self._prev_spectrum  = None
+        self._bass_level     = 0.0
+        self._mid_level      = 0.0
+        self._high_level     = 0.0
         cx, cy = (gw - 1) / 2.0, (gh - 1) / 2.0
         ys, xs = np.mgrid[0:gh, 0:gw]
         self._dist_map = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2).astype(np.float32)
@@ -326,47 +329,56 @@ class Visualizer(monome.GridApp):
                 self.framebuffer[1, center - 1] = 4
 
     def render_pulse(self):
-        # ── onset detection (spectral flux) ───────────────────────────────────
-        block    = latest_block(1024)
+        # ── three concentric frequency-band level meters ───────────────────────
+        # inner  zone (dist < 3.5) → bass   40–250 Hz
+        # middle zone (3.5–7.0)   → mids  250–4000 Hz
+        # outer  zone (7.0–10.6)  → highs 4000–16000 Hz
+        block    = latest_block(2048)
         mono     = block.mean(axis=1)
         spectrum = np.abs(np.fft.rfft(mono * np.hanning(len(mono))))
 
-        if self._prev_spectrum is not None:
-            flux = float(np.sum(np.maximum(0.0, spectrum - self._prev_spectrum)))
-        else:
-            flux = 0.0
-        self._prev_spectrum = spectrum
+        # per-band sensitivity: bass scaled down (dense energy), highs boosted (sparse)
+        norm     = state.gain / (GRID_H * 3.0)
+        bass_lvl = float(np.clip(np.log1p(spectrum[_bass_lo:_bass_hi].mean()) * norm * 0.7, 0.0, 1.0))
+        mid_lvl  = float(np.clip(np.log1p(spectrum[_mid_lo:_mid_hi].mean())   * norm * 2.0, 0.0, 1.0))
+        high_lvl = float(np.clip(np.log1p(spectrum[_high_lo:_high_hi].mean()) * norm * 3.0, 0.0, 1.0))
 
-        self._onset_avg = 0.9 * self._onset_avg + 0.1 * flux
+        # fast attack, fast decay — punchy response that drops between beats
+        self._bass_level = (ATTACK      * bass_lvl + (1 - ATTACK)      * self._bass_level
+                            if bass_lvl > self._bass_level
+                            else PULSE_DECAY * bass_lvl + (1 - PULSE_DECAY) * self._bass_level)
+        self._mid_level  = (ATTACK      * mid_lvl  + (1 - ATTACK)      * self._mid_level
+                            if mid_lvl  > self._mid_level
+                            else PULSE_DECAY * mid_lvl  + (1 - PULSE_DECAY) * self._mid_level)
+        self._high_level = (ATTACK      * high_lvl + (1 - ATTACK)      * self._high_level
+                            if high_lvl > self._high_level
+                            else PULSE_DECAY * high_lvl + (1 - PULSE_DECAY) * self._high_level)
 
-        if self._onset_cooldown > 0:
-            self._onset_cooldown -= 1
+        INNER_R = 3.5
+        MID_R   = 7.0
+        OUTER_R = 10.6   # sqrt(7.5² + 7.5²) — grid corner distance
 
-        threshold = ONSET_THRESHOLD * (8.0 / max(state.gain, 0.1))
-        if (flux > self._onset_avg * threshold
-                and flux > ONSET_MIN_FLUX
-                and self._onset_cooldown == 0):
-            self._pulses.append([0.0, 15])
-            self._onset_cooldown = ONSET_COOLDOWN
+        bass_edge = self._bass_level * INNER_R
+        mid_edge  = INNER_R + self._mid_level  * (MID_R   - INNER_R)
+        high_edge = MID_R   + self._high_level * (OUTER_R - MID_R)
 
-        # ── expand pulses ─────────────────────────────────────────────────────
-        self._pulse_ctr += 1
-        if self._pulse_ctr >= PULSE_SPEED:
-            self._pulse_ctr = 0
-            _DECAY = {15: 9, 9: 4, 4: 0}
-            next_pulses = []
-            for p in self._pulses:
-                p[0] += 3.5
-                p[1] = _DECAY[p[1]]
-                if p[1] > 0:
-                    next_pulses.append(p)
-            self._pulses = next_pulses
-
-        # ── draw ──────────────────────────────────────────────────────────────
-        self.framebuffer.fill(0)
         dm = self._dist_map
-        for radius, brightness in self._pulses:
-            self.framebuffer[np.abs(dm - radius) < 0.8] = brightness
+        self.framebuffer.fill(0)
+
+        # bass inner zone — fills from centre outward
+        bass_lit = dm < bass_edge
+        self.framebuffer[bass_lit] = 15
+        self.framebuffer[bass_lit & (dm >= bass_edge - 0.8)] = 9
+
+        # mid ring — fills from inner boundary outward
+        mid_lit = (dm >= INNER_R) & (dm < mid_edge)
+        self.framebuffer[mid_lit] = 15
+        self.framebuffer[mid_lit & (dm >= mid_edge - 0.8)] = 9
+
+        # high outer ring — fills from mid boundary outward
+        high_lit = (dm >= MID_R) & (dm < high_edge)
+        self.framebuffer[high_lit] = 15
+        self.framebuffer[high_lit & (dm >= high_edge - 0.8)] = 9
 
     def render_lissajous(self):
         gh, gw = self.framebuffer.shape
@@ -466,9 +478,9 @@ async def render_loop(viz):
             viz.render_waveform()
         elif state.preset == '04 lissajous':
             viz.render_lissajous()
-        elif state.preset == '05 beat pulse':
+        elif state.preset == '05 rings':
             viz.render_pulse()
-        elif state.preset == '07 waveform':
+        elif state.preset == '07 ripple':
             viz.render_centre()
         viz.flush()
         await asyncio.sleep(period)
