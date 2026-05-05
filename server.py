@@ -71,9 +71,14 @@ def api_settings():
         state.gain = float(data['gain'])
         state.preset_gain[state.preset] = state.gain
         state.save_config()
+    if 'led_level' in data:
+        state.led_level = max(0.1, min(1.0, float(data['led_level'])))
+        state.preset_brightness[state.preset] = state.led_level
+        state.save_config()
     if 'preset' in data and data['preset'] in state.PRESETS:
-        state.preset = data['preset']
-        state.gain   = state.preset_gain[state.preset]
+        state.preset    = data['preset']
+        state.gain      = state.preset_gain[state.preset]
+        state.led_level = state.preset_brightness[state.preset]
         state.save_config()
     if 'audio_device' in data:
         state.audio_device  = int(data['audio_device'])

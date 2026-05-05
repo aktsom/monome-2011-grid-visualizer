@@ -1,161 +1,163 @@
 
 monome 2011 visualizer
 ======================
-Real-time audio visualizer for monome grid (16×16) 4 step varibright. Works with newer grids as well but only 4 led levels are used.
-Audio input → analysis → grid LEDs, controlled via browser UI at http://localhost:5000
+real-time audio visualizer for monome grid (16×16) 4 step varibright. works with newer grids as well but only 4 led levels are used.
+audio input → analysis → grid leds, controlled via browser ui at http://localhost:5000
 
 
-REQUIREMENTS
+requirements
 ------------
-- Python 3.9 or later
+- python 3.9 or later
 - monome serialosc (must be running before starting the app)
-- A monome grid connected via USB
+- a monome grid connected via usb
 
 
-PYTHON DEPENDENCIES
+python dependencies
 -------------------
-Install with pip:
+install with pip:
 
     pip install numpy sounddevice flask pymonome pystray pillow
 
-On macOS and Linux use pip3 if pip is not found:
+on macOS and linux use pip3 if pip is not found:
 
     pip3 install numpy sounddevice flask pymonome pystray pillow
 
 
-SERIALOSC INSTALLATION
+serialosc installation
 -----------------------
 serialosc is the background service that communicates with the monome grid.
 
-  Windows:
-    Download and run the installer from https://monome.org/docs/serialosc/setup/
+  windows:
+    download and run the installer from https://monome.org/docs/serialosc/setup/
 
   macOS:
-    Install via Homebrew:
+    install via homebrew:
       brew install serialosc
-    Or download the installer from https://monome.org/docs/serialosc/setup/
+    or download the installer from https://monome.org/docs/serialosc/setup/
 
-  Linux:
-    Install dependencies, then build from source:
-      sudo apt install liblo-dev libavahi-compat-libdnssd-dev  # Debian/Ubuntu
+  linux:
+    install dependencies, then build from source:
+      sudo apt install liblo-dev libavahi-compat-libdnssd-dev  # debian/ubuntu
       git clone https://github.com/monome/serialosc.git
       cd serialosc
       git submodule update --init --recursive
       ./waf configure
       ./waf
       sudo ./waf install
-    Start the service:
+    start the service:
       serialoscd
 
 
-AUDIO DEPENDENCIES
+audio dependencies
 ------------------
-  Windows:
-    sounddevice works out of the box. For best results use an ASIO or WASAPI driver.
+  windows:
+    sounddevice works out of the box. for best results use an asio or wasapi driver.
 
   macOS:
-    sounddevice uses Core Audio natively — no extra setup needed.
-    If you see PortAudio errors:
+    sounddevice uses core audio natively — no extra setup needed.
+    if you see portaudio errors:
       brew install portaudio
 
-  Linux:
-    Install PortAudio:
-      sudo apt install libportaudio2 portaudio19-dev  # Debian/Ubuntu
-      sudo dnf install portaudio-devel                # Fedora
-    PipeWire, PulseAudio, ALSA, and JACK are all supported.
+  linux:
+    install portaudio:
+      sudo apt install libportaudio2 portaudio19-dev  # debian/ubuntu
+      sudo dnf install portaudio-devel                # fedora
+    pipewire, pulseaudio, alsa, and jack are all supported.
 
 
-RUNNING THE APP
+running the app
 ---------------
-  Windows:
+  windows:
     python main.py
-    Or double-click launch.vbs for a silent background start (click 4x4 icon in windows system tray to launch browser ui)
+    or double-click launch.vbs for a silent background start (click 4x4 icon in windows system tray to launch browser ui)
 
-  macOS / Linux:
+  macOS / linux:
     python3 main.py
 
-  Linux — capturing system audio (loopback):
-    By default the visualizer captures microphone input. To capture what is
+  linux — capturing system audio (loopback):
+    by default the visualizer captures microphone input. to capture what is
     playing through your speakers instead, use the included launcher script:
 
-      1. Make it executable (once):
+      1. make it executable (once):
            chmod +x start_linux.sh
 
-      2. Run it instead of main.py:
+      2. run it instead of main.py:
            ./start_linux.sh
 
-    This starts the visualizer and automatically routes the audio stream to
-    the system output monitor via PipeWire/PulseAudio. Requires pavucontrol
+    this starts the visualizer and automatically routes the audio stream to
+    the system output monitor via pipewire/pulseaudio. requires pavucontrol
     to be installed:
            sudo apt install pavucontrol
 
-    Alternatively, route manually each session: open pavucontrol → Recording
-    tab → change the Python stream source to "Monitor of Built-in Audio".
+    alternatively, route manually each session: open pavucontrol → recording
+    tab → change the python stream source to "monitor of built-in audio".
 
-  The browser UI opens at http://localhost:5000
-  A system tray icon provides quick access and a quit option.
-  Only one instance can run at a time.
+  the browser ui opens at http://localhost:5000
+  a system tray icon provides quick access and a quit option.
+  only one instance can run at a time.
 
 
-UI CONTROLS
+ui controls
 -----------
-  Grid          — select and connect a detected monome grid
-  Audio Input   — select audio input device; click Apply to switch
-                  "show all inputs" reveals non-ASIO/WASAPI/CoreAudio devices
-  Visual Preset — choose one of seven presets (see below)
-  Gain          — input sensitivity; default 8.0, range 1–20
+  grid          — select and connect a detected monome grid
+  audio input   — select audio input device; click apply to switch
+                  "show all inputs" reveals non-asio/wasapi/coreaudio devices
+  visual preset — choose one of seven presets (see below)
+  led level     — overall led brightness; range 0.1–1.0
+                  each preset remembers its own setting
+  gain          — input sensitivity; default 8.0, range 1–20
                   each preset remembers its own gain setting
 
-  Spectrum presets also show three additional sections:
+  spectrum presets also show three additional sections:
 
-  LED Roles       — brightness (1–15) for bar fill, bar tip, and peak dot
-  Column Brightness — per-column LED scale (0–1.0)
-  Band Trim       — per-column height multiplier (0–2.0)
+  led roles       — brightness (1–15) for bar fill, bar tip, and peak dot
+  column brightness — per-column led scale (0–1.0)
+  band trim       — per-column height multiplier (0–2.0)
 
-  Each section has a Reset button. All settings are per-preset and
+  each section has a reset button. all settings are per-preset and
   persist across restarts.
 
 
-PRESETS
+presets
 -------
-  01 spectrum       16-band log-spaced spectrum, 40 Hz – 16 kHz
+  01 spectrum       16-band log-spaced spectrum, 40 hz – 16 khz
   02 spectrum 8     8-band spectrum, each band 2 columns wide
-  03 flame          Amplitude envelope rendered as an upward fire shape,
+  03 flame          amplitude envelope rendered as an upward fire shape,
                     scrolling from bottom with brightness decay and flickering tips
-  04 lissajous      L vs R XY plot with brightness trail decay
-  05 rings          Three concentric frequency-band level meters:
-                    inner ring = bass (40–250 Hz), middle ring = mids (250–4000 Hz),
-                    outer ring = highs (4000–16000 Hz)
+  04 lissajous      l vs r xy plot with brightness trail decay
+  05 rings          three concentric frequency-band level meters:
+                    inner ring = bass (40–250 hz), middle ring = mids (250–4000 hz),
+                    outer ring = highs (4000–16000 hz)
   06 spectrum peak  16-band spectrum with floating peak-hold dots
                     (not visible on older 4 step led grids)
-  07 ripple         Amplitude envelope as symmetric horizontal bars expanding
+  07 ripple         amplitude envelope as symmetric horizontal bars expanding
                     from the centre outward, with brightness decay trail
 
 
-FREQUENCY BANDS (spectrum presets 01, 02, 06)
+frequency bands (spectrum presets 01, 02, 06)
 ----------------------------------------------
-  Col  1   40 –   58 Hz     Col  9    800 – 1.2 kHz
-  Col  2   58 –   85 Hz     Col 10    1.2 – 1.7 kHz
-  Col  3   85 –  123 Hz     Col 11    1.7 – 2.5 kHz
-  Col  4  123 –  179 Hz     Col 12    2.5 – 3.6 kHz
-  Col  5  179 –  260 Hz     Col 13    3.6 – 5.2 kHz
-  Col  6  260 –  378 Hz     Col 14    5.2 – 7.6 kHz
-  Col  7  378 –  550 Hz     Col 15    7.6 –  11 kHz
-  Col  8  550 –  800 Hz     Col 16     11 –  16 kHz
+  col  1   40 –   58 hz     col  9    800 – 1.2 khz
+  col  2   58 –   85 hz     col 10    1.2 – 1.7 khz
+  col  3   85 –  123 hz     col 11    1.7 – 2.5 khz
+  col  4  123 –  179 hz     col 12    2.5 – 3.6 khz
+  col  5  179 –  260 hz     col 13    3.6 – 5.2 khz
+  col  6  260 –  378 hz     col 14    5.2 – 7.6 khz
+  col  7  378 –  550 hz     col 15    7.6 –  11 khz
+  col  8  550 –  800 hz     col 16     11 –  16 khz
 
-  02 spectrum 8 merges pairs: col 1 = 40–85 Hz, col 2 = 85–179 Hz, etc.
+  02 spectrum 8 merges pairs: col 1 = 40–85 hz, col 2 = 85–179 hz, etc.
 
 
-STARTUP ON LOGIN (optional)
+startup on login (optional)
 ----------------------------
-  Right-click the system tray icon and enable "Start with system".
+  right-click the system tray icon and enable "start with system".
 
-  Windows  — adds entry to HKCU run registry key via launch.vbs
-  macOS    — installs a launchd plist in ~/Library/LaunchAgents/
-  Linux    — creates a .desktop file in ~/.config/autostart/
+  windows  — adds entry to hkcu run registry key via launch.vbs
+  macOS    — installs a launchd plist in ~/library/launchagents/
+  linux    — creates a .desktop file in ~/.config/autostart/
 
 
-CONFIG FILE
+config file
 -----------
-  Settings are saved automatically to config.json in the app folder.
-  Delete this file to reset everything to defaults.
+  settings are saved automatically to config.json in the app folder.
+  delete this file to reset everything to defaults.

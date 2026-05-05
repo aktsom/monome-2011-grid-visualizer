@@ -458,10 +458,13 @@ class Visualizer(monome.GridApp):
 
     def flush(self):
         gh, gw = self.framebuffer.shape
+        lv = state.led_level
+        fb = (np.clip(np.round(self.framebuffer * lv), 0, 15).astype(np.uint8)
+              if lv < 1.0 else self.framebuffer)
         for qy in range(0, gh, 8):
             for qx in range(0, gw, 8):
                 data = [
-                    [int(self.framebuffer[qy + r, qx + c]) for c in range(8)]
+                    [int(fb[qy + r, qx + c]) for c in range(8)]
                     for r in range(8)
                 ]
                 self.grid.led_level_map(qx, qy, data)

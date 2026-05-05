@@ -190,6 +190,15 @@
   </section>
 
   <section>
+    <h2>LED Level</h2>
+    <div class="gain-row">
+      <input type="range" id="led-level-slider" min="0.1" max="1" step="0.05" value="1"
+             oninput="applyLedLevel(this.value)">
+      <span class="gain-val" id="led-level-val">1.0</span>
+    </div>
+  </section>
+
+  <section>
     <h2>Gain</h2>
     <div class="gain-row">
       <input type="range" id="gain-slider" min="1" max="20" step="0.5" value="8"
@@ -234,6 +243,10 @@
 
     async function refreshStatus() {
       const s = await fetchJSON('/api/status');
+
+      // led level
+      $('led-level-slider').value = s.led_level;
+      $('led-level-val').textContent = parseFloat(s.led_level).toFixed(2);
 
       // gain
       $('gain-slider').value = s.gain;
@@ -356,6 +369,15 @@
       rebuildColBrightness();
       rebuildTrimSliders();
       await refreshStatus();
+    }
+
+    async function applyLedLevel(val) {
+      $('led-level-val').textContent = parseFloat(val).toFixed(2);
+      await fetchJSON('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({led_level: parseFloat(val)}),
+      });
     }
 
     async function applyGain(val) {
@@ -566,7 +588,7 @@
     }
 
     loadAudioDevices();
-    loadPresets().then(() => { refreshStatus(); loadLedRoles(); loadColBrightness(); loadTrim(); });
+    loadPresets().then(async () => { await refreshStatus(); loadLedRoles(); loadColBrightness(); loadTrim(); });
     heartbeat();
     setInterval(refreshStatus, 2000);   // poll for grid list + connection state
     setInterval(heartbeat, 3000);       // keep render loop alive while tab is open

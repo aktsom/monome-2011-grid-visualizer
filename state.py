@@ -22,6 +22,7 @@ restart_audio = False   # set True by UI to trigger stream restart
 reconnect_grid = None   # set to port int by UI to trigger grid reconnect
 active_grid   = None    # id of currently connected grid
 last_heartbeat = time.time()  # updated by browser ping; 0 = never received
+led_level     = 1.0     # overall LED brightness [0.1, 1.0]; per-preset
 
 # ── grids dict — protected by lock (dict mutation not atomic) ─────────────────
 _lock = threading.Lock()
@@ -41,6 +42,7 @@ def add_grid(id, port, type):
 PRESETS = ['01 spectrum', '02 spectrum 8', '03 flame', '04 lissajous', '05 rings', '06 spectrum peak', '07 ripple']
 preset_gain = {p: 8.0 for p in PRESETS}
 preset_gain['03 flame'] = 3.0
+preset_brightness = {p: 1.0 for p in PRESETS}
 
 _TRIM_DEFAULTS = {
     '01 spectrum':      [0.7, 0.7, 0.8, 0.9, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
@@ -62,7 +64,7 @@ col_brightness = {k: [1.0] * n for k, n in _COL_BRIGHTNESS_SIZES.items()}
 
 def load_config():
     """Load persisted settings from config.json (called once at startup)."""
-    global audio_device, gain, preset, band_trim, preset_gain, led_roles, col_brightness
+    global audio_device, gain, preset, band_trim, preset_gain, led_roles, col_brightness, led_level, preset_brightness
     try:
         with open(_CONFIG) as f:
             c = json.load(f)
@@ -89,6 +91,11 @@ def load_config():
             for k, v in c['col_brightness'].items():
                 if k in col_brightness and len(v) == len(col_brightness[k]):
                     col_brightness[k] = [float(x) for x in v]
+        if 'preset_brightness' in c and isinstance(c['preset_brightness'], dict):
+            for k, v in c['preset_brightness'].items():
+                if k in preset_brightness:
+                    preset_brightness[k] = max(0.1, min(1.0, float(v)))
+        led_level = preset_brightness[preset]
         print(f"config loaded (device={audio_device}, gain={gain}, preset={preset})")
     except FileNotFoundError:
         pass  # first run — no config yet
@@ -101,12 +108,13 @@ def save_config():
     try:
         with open(_CONFIG, 'w') as f:
             json.dump({
-                'audio_device':   audio_device,
-                'preset':         preset,
-                'preset_gain':    preset_gain,
-                'band_trim':      band_trim,
-                'led_roles':      led_roles,
-                'col_brightness': col_brightness,
+                'audio_device':     audio_device,
+                'preset':           preset,
+                'preset_gain':      preset_gain,
+                'preset_brightness': preset_brightness,
+                'band_trim':        band_trim,
+                'led_roles':        led_roles,
+                'col_brightness':   col_brightness,
             }, f)
     except Exception as e:
         print(f"config save error: {e}")
@@ -116,6 +124,7 @@ def snapshot():
     """Return a copy of all state safe to serialise to JSON."""
     return {
         'gain':         gain,
+        'led_level':    led_level,
         'preset':       preset,
         'audio_device': audio_device,
         'grids':        get_grids(),
