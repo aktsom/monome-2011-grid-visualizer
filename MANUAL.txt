@@ -16,128 +16,128 @@ python dependencies
 -------------------
 install with pip:
 
-    pip install numpy sounddevice flask pymonome pystray pillow
+pip install numpy sounddevice flask pymonome pystray pillow
 
 on macOS and linux use pip3 if pip is not found:
 
-    pip3 install numpy sounddevice flask pymonome pystray pillow
+pip3 install numpy sounddevice flask pymonome pystray pillow
 
 
 serialosc installation
 -----------------------
 serialosc is the background service that communicates with the monome grid.
 
-  windows:
-    download and run the installer from https://monome.org/docs/serialosc/setup/
+windows:
+download and run the installer from https://monome.org/docs/serialosc/setup/
 
-  macOS:
-    install via homebrew:
-      brew install serialosc
-    or download the installer from https://monome.org/docs/serialosc/setup/
+macOS:
+install via homebrew:
+brew install serialosc or download the installer from https://monome.org/docs/serialosc/setup/
 
-  linux:
-    install dependencies, then build from source:
-      sudo apt install liblo-dev libavahi-compat-libdnssd-dev  # debian/ubuntu
-      git clone https://github.com/monome/serialosc.git
-      cd serialosc
-      git submodule update --init --recursive
-      ./waf configure
-      ./waf
-      sudo ./waf install
-    start the service:
-      serialoscd
+linux:
+install dependencies,then build from source:
+sudo apt install liblo-dev libavahi-compat-libdnssd-dev  # debian/ubuntu 
+git clone https://github.com/monome/serialosc.git
+cd serialosc 
+git submodule update --init --recursive
+./waf configure
+./waf
+sudo ./waf install
+start the service:
+serialoscd
 
 
 audio dependencies
 ------------------
-  windows:
-    sounddevice works out of the box. for best results use an asio or wasapi driver.
+windows:
+sounddevice works out of the box. for best results use an asio or wasapi driver.
 
-  macOS:
-    (i haven't tested it on mac since i don't have one, so i don't know for sure that it will work)
-    sounddevice uses core audio natively — no extra setup needed.
-    if you see portaudio errors:
-      brew install portaudio
+macOS:
+(i haven't tested it on mac since i don't have one, so i don't know for sure that it will work)
+sounddevice uses core audio natively — no extra setup needed.if you see portaudio errors: brew install portaudio
 
-  linux:
-    install portaudio:
-      sudo apt install libportaudio2 portaudio19-dev  # debian/ubuntu
-      sudo dnf install portaudio-devel                # fedora
-    pipewire, pulseaudio, alsa, and jack are all supported.
+linux:
+install portaudio:
+sudo apt install libportaudio2 portaudio19-dev  # debian/ubuntu
+sudo dnf install portaudio-devel                # fedora
+pipewire, pulseaudio, alsa, and jack are all supported.
 
 
 running the app
 ---------------
-  windows:
-    python main.py
-    or double-click launch.vbs for a silent background start (click 4x4 icon in windows system tray to launch browser ui)
+windows:
+python main.py or double-click launch.vbs for a silent background start (click 4x4 icon in windows system tray to launch browser ui)
 
-  macOS / linux:
-    python3 main.py
+macOS / linux:
+python3 main.py
 
-  linux — capturing system audio (loopback):
-    by default the visualizer captures microphone input. to capture what is
-    playing through your speakers instead, use the included launcher script:
+linux — capturing system audio (loopback):
+by default the visualizer captures microphone input. to capture what is playing through your speakers instead, use the included launcher script:
 
-      1. make it executable (once):
-           chmod +x start_linux.sh
+1. make it executable (once): chmod +x start_linux.sh
 
-      2. run it instead of main.py:
-           ./start_linux.sh
+2. run it instead of main.py: ./start_linux.sh
 
-    this starts the visualizer and automatically routes the audio stream to
-    the system output monitor via pipewire/pulseaudio. requires pavucontrol
-    to be installed:
-           sudo apt install pavucontrol
+this starts the visualizer and automatically routes the audio stream to the system output monitor via pipewire/pulseaudio. requires pavucontrol to be installed:
+sudo apt install pavucontrol
 
-    alternatively, route manually each session: open pavucontrol → recording
-    tab → change the python stream source to "monitor of built-in audio".
+alternatively, route manually each session: open pavucontrol → recording tab → change the python stream source to "monitor of built-in audio".
 
-  the browser ui opens at http://localhost:5000
-  a system tray icon provides quick access and a quit option.
-  only one instance can run at a time.
+the browser ui opens at http://localhost:5000
+a system tray icon provides quick access and a quit option. only one instance can run at a time.
 
 
 ui controls
 -----------
-  grid          — select and connect a detected monome grid
-  audio input   — select audio input device; click apply to switch
-                  "show all inputs" reveals non-asio/wasapi/coreaudio devices
-  visual preset — choose one of eight presets (see below)
-  led level     — overall led brightness; range 0.1–1.0
+grid          — select and connect a detected monome grid
+audio input   — select audio input device; click apply to switch
+"show all inputs" reveals non-asio/wasapi/coreaudio devices
+visual preset — choose one of eight presets (see below)
+led level     — overall led brightness; range 0.1–1.0
                   each preset remembers its own setting
-  gain          — input sensitivity; default 8.0, range 1–20
+gain          — input sensitivity; default 8.0, range 1–20
                   each preset remembers its own gain setting
 
-  spectrum presets also show three additional sections:
+spectrum presets also show three additional sections:
 
-  led roles       — brightness (1–15) for bar fill, bar tip, and peak dot
-  column brightness — per-column led scale (0–1.0)
-  band trim       — per-column height multiplier (0–2.0)
+led roles       — brightness (1–15) for bar fill, bar tip, and peak dot
+column brightness — per-column led scale (0–1.0)
+band trim       — per-column height multiplier (0–2.0)
 
-  each section has a reset button. all settings are per-preset and
-  persist across restarts.
+each section has a reset button. all settings are per-preset and persist across restarts.
 
 
 presets
 -------
-  01 spectrum       16-band log-spaced spectrum, 40 hz – 16 khz
-  02 spectrum 8     8-band spectrum, each band 2 columns wide
-  03 flame          amplitude envelope rendered as an upward fire shape,
-                    scrolling from bottom with brightness decay and flickering tips
-  04 lissajous      l vs r xy plot with brightness trail decay
-  05 rings          three concentric frequency-band level meters:
-                    inner ring = bass (40–250 hz), middle ring = mids (250–4000 hz),
-                    outer ring = highs (4000–16000 hz)
-  06 spectrum peak  16-band spectrum with floating peak-hold dots
+01 spectrum:       
+16-band log-spaced spectrum, 40 hz – 16 khz
+
+02 spectrum 8:    
+8-band spectrum, each band 2 columns wide
+
+03 flame:         
+amplitude envelope rendered as an upward fire shape,
+scrolling from bottom with brightness decay and flickering tips
+
+04 lissajous:      
+l vs r xy plot with brightness trail decay
+
+05 rings:        
+three concentric frequency-band level meters:
+inner ring = bass(40–250 hz), middle ring = mids(250–4000 hz),outer ring = highs (4000–16000 hz)
+
+06 spectrum peak: 
+16-band spectrum with floating peak-hold dots
                     
-  07 ripple         amplitude envelope as symmetric horizontal bars expanding
-                    from the centre outward, with brightness decay trail
-  08 carassius      three fish swimming freely across the grid, each driven
-     auratus        by a frequency band: bass (fish 1), mids (fish 2),
-                    highs (fish 3). each fish leaves a brightness trail and
-                    scatters particles in its wake. when idle, fish drift
-                    slowly and launch random bursts at long intervals.
+07 ripple:         
+amplitude envelope as symmetric horizontal bars expanding
+from the centre outward, with brightness decay trail
+
+08 carassius auratus:     
+three fish swimming freely across the grid, each driven       by a frequency band: bass (fish 1), mids (fish 2),
+highs (fish 3). 
+
+each fish leaves a brightness trail and scatters particles in its wake. when idle, fish drift slowly and launch random bursts at long intervals.
 
 
 frequency bands (spectrum presets 01, 02, 06)
@@ -151,19 +151,22 @@ frequency bands (spectrum presets 01, 02, 06)
   col  7  378 –  550 hz     col 15    7.6 –  11 khz
   col  8  550 –  800 hz     col 16     11 –  16 khz
 
-  02 spectrum 8 merges pairs: col 1 = 40–85 hz, col 2 = 85–179 hz, etc.
+02 spectrum 8 merges pairs: 
+col 1 = 40–85 hz, col 2 = 85–179 hz, etc.
 
 
 startup on login (optional)
 ----------------------------
-  right-click the system tray icon and enable "start with system".
+right-click the system tray icon and enable "start with system".
 
-  windows  — adds entry to hkcu run registry key via launch.vbs
-  macOS    — installs a launchd plist in ~/library/launchagents/
-  linux    — creates a .desktop file in ~/.config/autostart/
+windows  — adds entry to hkcu run registry key via launch.vbs
+
+macOS    — installs a launchd plist in ~/library/launchagents/
+
+linux    — creates a .desktop file in ~/.config/autostart/
 
 
 config file
 -----------
-  settings are saved automatically to config.json in the app folder.
-  delete this file to reset everything to defaults.
+settings are saved automatically to config.json in the app folder.
+delete this file to reset everything to defaults.
