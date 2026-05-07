@@ -46,6 +46,15 @@ WF_FLICKER_EVERY = 5      # scroll steps between flicker pattern re-rolls (~250m
 
 PULSE_DECAY      = 0.35   # beat pulse only — faster than DECAY for punchy response
 
+ORB_TRAIL_LEN    = 16     # trail positions stored
+ORB_MAX_SPEED    = 0.9    # pixels/frame at full audio level (fish 1)
+ORB_SPEED_ATTACK = 0.75   # how quickly speed rises on a hit
+ORB_SPEED_DECAY  = 0.93   # multiplicative slowdown per frame
+ORB_BOUNDARY     = 6.5    # soft boundary radius from grid centre
+ORB_BURST_PROB   = 0.008  # per-frame chance of idle burst when cooldown=0
+ORB_BURST_CD_MIN = 400    # min frames between bursts (~13 s at 30 fps)
+ORB_BURST_CD_MAX = 1200   # max frames between bursts (~40 s at 30 fps)
+
 
 
 HEARTBEAT_TIMEOUT = 30.0
@@ -124,6 +133,24 @@ class Visualizer(monome.GridApp):
         self._mid_level       = 0.0   # smoothed mid band level  [0, 1]
         self._high_level      = 0.0   # smoothed high band level [0, 1]
         self._dist_map        = None  # precomputed per-cell distance from centre
+        self._orb_px      = 7.5;  self._orb_py      = 7.5
+        self._orb_heading = 0.0;  self._orb_speed   = 0.0
+        self._orb_trail        = []
+        self._orb_particles    = []
+        self._orb2_px     = 7.5;  self._orb2_py     = 7.5
+        self._orb2_heading= np.pi * 2 / 3; self._orb2_speed = 0.0
+        self._orb2_trail       = []
+        self._orb2_particles   = []
+        self._orb3_px     = 7.5;  self._orb3_py     = 7.5
+        self._orb3_heading= np.pi * 4 / 3; self._orb3_speed = 0.0
+        self._orb3_trail       = []
+        self._orb3_particles   = []
+        self._orb_level        = 0.0
+        self._orb2_level       = 0.0
+        self._orb3_level       = 0.0
+        self._orb_burst_cd     = np.random.randint(0, ORB_BURST_CD_MAX)
+        self._orb2_burst_cd    = np.random.randint(0, ORB_BURST_CD_MAX)
+        self._orb3_burst_cd    = np.random.randint(0, ORB_BURST_CD_MAX)
 
     def on_grid_ready(self):
         gw, gh = self.grid.width, self.grid.height
@@ -147,6 +174,24 @@ class Visualizer(monome.GridApp):
         self._mid_level      = 0.0
         self._high_level     = 0.0
         cx, cy = (gw - 1) / 2.0, (gh - 1) / 2.0
+        self._orb_px      = cx + 5.0; self._orb_py      = cy
+        self._orb_heading = np.pi / 2; self._orb_speed  = 0.0
+        self._orb_trail        = []
+        self._orb_particles    = []
+        self._orb2_px     = cx - 2.5; self._orb2_py     = cy - 4.3
+        self._orb2_heading= np.pi + np.pi / 6; self._orb2_speed = 0.0
+        self._orb2_trail       = []
+        self._orb2_particles   = []
+        self._orb3_px     = cx - 2.5; self._orb3_py     = cy + 4.3
+        self._orb3_heading= -(np.pi / 6); self._orb3_speed = 0.0
+        self._orb3_trail       = []
+        self._orb3_particles   = []
+        self._orb_level        = 0.0
+        self._orb2_level       = 0.0
+        self._orb3_level       = 0.0
+        self._orb_burst_cd     = np.random.randint(0, ORB_BURST_CD_MAX)
+        self._orb2_burst_cd    = np.random.randint(0, ORB_BURST_CD_MAX)
+        self._orb3_burst_cd    = np.random.randint(0, ORB_BURST_CD_MAX)
         ys, xs = np.mgrid[0:gh, 0:gw]
         self._dist_map = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2).astype(np.float32)
         if self._render_task and not self._render_task.done():
@@ -456,6 +501,127 @@ class Visualizer(monome.GridApp):
                             self.framebuffer[row, ccol - dc]     = edge_b
                             self.framebuffer[row, ccol + dc - 1] = edge_b
 
+    def render_orb(self):
+        gh, gw = self.framebuffer.shape
+        cx, cy = (gw - 1) / 2.0, (gh - 1) / 2.0
+
+        # one FFT shared by all three fish
+        block_2k = latest_block(2048)
+        mono_2k  = block_2k.mean(axis=1)
+        spectrum = np.abs(np.fft.rfft(mono_2k * np.hanning(len(mono_2k))))
+        norm     = state.gain / 20.0
+
+        raw1 = float(np.clip(np.log1p(spectrum[_bass_lo:_bass_hi].mean()) * norm * 0.7, 0.0, 1.0))
+        raw2 = float(np.clip(np.log1p(spectrum[_mid_lo:_mid_hi].mean())   * norm * 2.0, 0.0, 1.0))
+        raw3 = float(np.clip(np.log1p(spectrum[_high_lo:_high_hi].mean()) * norm * 3.0, 0.0, 1.0))
+
+        # fast attack, fast release — fish snaps up on hit, drops quickly between hits
+        self._orb_level  = 0.85 * raw1 + 0.15 * self._orb_level  if raw1 > self._orb_level  else 0.4 * raw1 + 0.6 * self._orb_level
+        self._orb2_level = 0.85 * raw2 + 0.15 * self._orb2_level if raw2 > self._orb2_level else 0.4 * raw2 + 0.6 * self._orb2_level
+        self._orb3_level = 0.85 * raw3 + 0.15 * self._orb3_level if raw3 > self._orb3_level else 0.4 * raw3 + 0.6 * self._orb3_level
+
+        level1, level2, level3 = self._orb_level, self._orb2_level, self._orb3_level
+
+        def _update_fish(px, py, heading, speed, level, burst_cd, max_spd, turn_sig, burst_imp):
+            silent     = level < 0.1
+            target_spd = level * max_spd
+
+            # heading random walk — slow graceful turns vs quick nervous turns
+            heading += np.random.normal(0, 0.02 if silent else turn_sig)
+
+            # soft boundary — steer back toward centre when wandering too far
+            ddx, ddy = cx - px, cy - py
+            dist = np.hypot(ddx, ddy)
+            if dist > ORB_BOUNDARY:
+                toward = np.arctan2(ddy, ddx)
+                diff   = (toward - heading + np.pi) % (2 * np.pi) - np.pi
+                heading += 0.3 * diff
+
+            # speed — audio drives magnitude, idle drift is very slow
+            if silent:
+                if burst_cd > 0:
+                    burst_cd -= 1
+                elif np.random.random() < ORB_BURST_PROB:
+                    speed    = burst_imp
+                    burst_cd = np.random.randint(ORB_BURST_CD_MIN, ORB_BURST_CD_MAX)
+                speed *= 0.97
+                speed  = max(speed, 0.01)
+            else:
+                if speed < target_spd:
+                    speed = ORB_SPEED_ATTACK * target_spd + (1 - ORB_SPEED_ATTACK) * speed
+                else:
+                    speed *= ORB_SPEED_DECAY
+
+            px = float(np.clip(px + speed * np.cos(heading), 0, gw - 1))
+            py = float(np.clip(py + speed * np.sin(heading), 0, gh - 1))
+            hx = int(round(px))
+            hy = int(round(py))
+            return px, py, heading, speed, hx, hy, burst_cd
+
+        self._orb_px,  self._orb_py,  self._orb_heading,  self._orb_speed,  hx1, hy1, self._orb_burst_cd  = \
+            _update_fish(self._orb_px,  self._orb_py,  self._orb_heading,  self._orb_speed,  level1, self._orb_burst_cd,  0.90, 0.05, 0.70)
+        self._orb2_px, self._orb2_py, self._orb2_heading, self._orb2_speed, hx2, hy2, self._orb2_burst_cd = \
+            _update_fish(self._orb2_px, self._orb2_py, self._orb2_heading, self._orb2_speed, level2, self._orb2_burst_cd, 0.75, 0.07, 0.55)
+        self._orb3_px, self._orb3_py, self._orb3_heading, self._orb3_speed, hx3, hy3, self._orb3_burst_cd = \
+            _update_fish(self._orb3_px, self._orb3_py, self._orb3_heading, self._orb3_speed, level3, self._orb3_burst_cd, 0.60, 0.10, 0.40)
+
+        def _update_trail(trail, hx, hy):
+            trail.insert(0, (hx, hy))
+            if len(trail) > ORB_TRAIL_LEN:
+                trail.pop()
+
+        _update_trail(self._orb_trail,  hx1, hy1)
+        _update_trail(self._orb2_trail, hx2, hy2)
+        _update_trail(self._orb3_trail, hx3, hy3)
+
+        def _spawn_particles(particles, hx, hy, speed, max_p, prob, trail):
+            if speed > 0.05 and len(particles) < max_p:
+                if np.random.random() < prob:
+                    # derive movement direction from trail; spawn only behind the head
+                    look = min(3, len(trail) - 1)
+                    if look >= 1:
+                        dx = trail[0][0] - trail[look][0]
+                        dy = trail[0][1] - trail[look][1]
+                        dist = np.sqrt(dx * dx + dy * dy)
+                    else:
+                        dist = 0.0
+                    if dist > 0.3:
+                        bx, by   = -dx / dist, -dy / dist   # behind unit vector
+                        perp_x, perp_y = by, -bx             # perpendicular
+                        t  = np.random.uniform(1.0, 2.0)     # distance behind head
+                        s  = np.random.uniform(-1.0, 1.0)    # side scatter
+                        px = int(np.clip(round(hx + bx * t + perp_x * s), 0, gw - 1))
+                        py = int(np.clip(round(hy + by * t + perp_y * s), 0, gh - 1))
+                    else:
+                        px = int(np.clip(hx + np.random.randint(-1, 2), 0, gw - 1))
+                        py = int(np.clip(hy + np.random.randint(-1, 2), 0, gh - 1))
+                    particles.append([px, py, 28])
+            return [[p[0], p[1], p[2] - 1] for p in particles if p[2] > 1]
+
+        self._orb_particles  = _spawn_particles(self._orb_particles,  hx1, hy1, self._orb_speed,  10, 0.18, self._orb_trail)
+        self._orb2_particles = _spawn_particles(self._orb2_particles, hx2, hy2, self._orb2_speed,  5, 0.10, self._orb2_trail)
+        self._orb3_particles = _spawn_particles(self._orb3_particles, hx3, hy3, self._orb3_speed,  3, 0.07, self._orb3_trail)
+
+        _TRAIL_B1 = [15, 15, 9, 9, 9, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0]
+        _TRAIL_B2 = [15,  9, 9, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        _TRAIL_B3 = [15,  9, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+        self.framebuffer.fill(0)
+
+        # all particles behind all trails
+        for p in self._orb_particles + self._orb2_particles + self._orb3_particles:
+            if self.framebuffer[p[1], p[0]] == 0:
+                self.framebuffer[p[1], p[0]] = 4
+
+        # trails back to front: fish 3 (smallest), fish 2, fish 1 (biggest)
+        for trail, tb in ((self._orb3_trail, _TRAIL_B3),
+                          (self._orb2_trail, _TRAIL_B2),
+                          (self._orb_trail,  _TRAIL_B1)):
+            for i, (tx, ty) in enumerate(trail):
+                b = tb[i] if i < len(tb) else 0
+                if b > 0 and b > self.framebuffer[ty, tx]:
+                    self.framebuffer[ty, tx] = b
+
     def flush(self):
         gh, gw = self.framebuffer.shape
         lv = state.led_level
@@ -485,6 +651,8 @@ async def render_loop(viz):
             viz.render_pulse()
         elif state.preset == '07 ripple':
             viz.render_centre()
+        elif state.preset == '08 carassius auratus':
+            viz.render_orb()
         viz.flush()
         await asyncio.sleep(period)
 

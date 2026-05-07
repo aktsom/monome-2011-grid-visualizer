@@ -103,7 +103,7 @@ ui controls
   grid          — select and connect a detected monome grid
   audio input   — select audio input device; click apply to switch
                   "show all inputs" reveals non-asio/wasapi/coreaudio devices
-  visual preset — choose one of seven presets (see below)
+  visual preset — choose one of eight presets (see below)
   led level     — overall led brightness; range 0.1–1.0
                   each preset remembers its own setting
   gain          — input sensitivity; default 8.0, range 1–20
@@ -133,6 +133,11 @@ presets
                     
   07 ripple         amplitude envelope as symmetric horizontal bars expanding
                     from the centre outward, with brightness decay trail
+  08 carassius      three fish swimming freely across the grid, each driven
+     auratus        by a frequency band: bass (fish 1), mids (fish 2),
+                    highs (fish 3). each fish leaves a brightness trail and
+                    scatters particles in its wake. when idle, fish drift
+                    slowly and launch random bursts at long intervals.
 
 
 frequency bands (spectrum presets 01, 02, 06)
